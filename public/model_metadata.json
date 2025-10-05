@@ -1,5 +1,5 @@
 {
-  "feature_names": [
+  "features": [
     "Type_enc",
     "Air_temperature_K",
     "Process_temperature_K",
@@ -13,7 +13,7 @@
     "Torque_roll_std5",
     "Wear_diff"
   ],
-  "class_names": [
+  "classes": [
     "Heat Dissipation Failure",
     "No Failure",
     "Overstrain Failure",

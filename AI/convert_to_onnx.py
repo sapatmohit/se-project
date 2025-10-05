@@ -6,6 +6,9 @@ import xgboost as xgb
 import json
 import pickle
 import os
+import onnxmltools
+from onnxmltools.convert.common.data_types import FloatTensorType
+import onnxruntime as ort
 
 # Get the directory of the current script
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -70,17 +73,77 @@ with open(metadata_path, 'w') as f:
 
 print(f"Model metadata saved to {metadata_path}")
 
-# For client-side inference, we'll also save a simplified version of the model
-# that can be used with xgboost.js or other JavaScript libraries
+# Convert to ONNX
+print("\n" + "="*50)
+print("Converting XGBoost model to ONNX format...")
+print("="*50)
 
-# Save the model in a format that can be used by xgboost.js
-# First, let's save the model in binary format which might be easier to work with
-binary_model_path = os.path.join(script_dir, "xgboost_model.bin")
-model.save_model(binary_model_path)
-print(f"Binary model saved to {binary_model_path}")
-
-print("Conversion preparation completed successfully!")
-print("\nTo use this model in client-side JavaScript, you can:")
-print("1. Use the ONNX model with onnxruntime-web (if conversion works)")
-print("2. Use the binary model with xgboost.js")
-print("3. Implement the feature engineering in JavaScript and use the model")
+try:
+    # Define the input type for ONNX conversion
+    # The model expects 12 features
+    num_features = len(model_info["features"])
+    initial_type = [('float_input', FloatTensorType([None, num_features]))]
+    
+    # Convert the XGBoost model to ONNX using onnxmltools
+    onnx_model = onnxmltools.convert_xgboost(
+        model,
+        initial_types=initial_type,
+        target_opset=12
+    )
+    
+    # Save the ONNX model
+    onnx_path = os.path.join(script_dir, "xgboost_model.onnx")
+    onnxmltools.utils.save_model(onnx_model, onnx_path)
+    
+    print(f"✓ ONNX model saved to: {onnx_path}")
+    
+    # Verify the ONNX model
+    print("\n" + "="*50)
+    print("Verifying ONNX model...")
+    print("="*50)
+    
+    # Load and run ONNX model
+    ort_session = ort.InferenceSession(onnx_path)
+    
+    # Get input/output names
+    input_name = ort_session.get_inputs()[0].name
+    output_names = [output.name for output in ort_session.get_outputs()]
+    
+    print(f"Input name: {input_name}")
+    print(f"Output names: {output_names}")
+    
+    # Run inference with ONNX model
+    onnx_result = ort_session.run(None, {input_name: sample_input})
+    
+    print(f"\nONNX model output (label): {onnx_result[0]}")
+    print(f"ONNX model output (probabilities) shape: {onnx_result[1].shape}")
+    print(f"ONNX model output (probabilities):\n{onnx_result[1]}")
+    
+    # Compare results
+    print("\n" + "="*50)
+    print("Comparison:")
+    print("="*50)
+    print(f"Original XGBoost: {original_result[0]}")
+    print(f"ONNX Model:       {onnx_result[1][0]}")
+    
+    # Check if results are close
+    if np.allclose(original_result[0], onnx_result[1][0], rtol=1e-4, atol=1e-4):
+        print("\n✓ SUCCESS: ONNX model produces equivalent results!")
+    else:
+        print("\n⚠ WARNING: Results differ slightly (this is usually acceptable)")
+    
+    print("\n" + "="*50)
+    print("Conversion completed successfully!")
+    print("="*50)
+    print(f"\nONNX model ready for browser use at: {onnx_path}")
+    print("\nNext steps:")
+    print("1. Copy the ONNX model to your Next.js public directory")
+    print("2. Install onnxruntime-web: npm install onnxruntime-web")
+    print("3. Update your client code to load and use the ONNX model")
+    
+except Exception as e:
+    print(f"\n✗ ERROR during conversion: {str(e)}")
+    print("\nFalling back to saving binary model...")
+    binary_model_path = os.path.join(script_dir, "xgboost_model.bin")
+    model.save_model(binary_model_path)
+    print(f"Binary model saved to {binary_model_path}")

@@ -1,6 +1,6 @@
 // Client-side XGBoost inference implementation
-import { engineerFeatures, getModelMetadata, getPredictionResult } from './ml-utils';
-import { loadXGBoostModel, getXGBoostPrediction, type XGBoostModel } from './xgboost-parser';
+import { engineerFeatures, getPredictionResult } from './ml-utils';
+import { loadXGBoostModel, loadModelMetadata, getXGBoostPrediction, type XGBoostModel, type ModelMetadata } from './xgboost-parser';
 
 // Type definitions
 interface PredictionInput {
@@ -56,7 +56,10 @@ export async function predictFailure(input: PredictionInput): Promise<Prediction
     // Use the actual model for prediction
     if (loadedModel) {
       const probabilities = getXGBoostPrediction(loadedModel, features);
-      const result = getPredictionResult(probabilities);
+      console.log('Raw probabilities from model:', probabilities);
+      
+      const result = await getPredictionResult(probabilities);
+      console.log('Prediction result:', result);
       
       return {
         failureType: result.failureType,

@@ -1,5 +1,5 @@
 // Client-side utilities for machine learning inference
-import modelMetadata from '../../AI/model_metadata.json';
+import { loadModelMetadata, type ModelMetadata } from './xgboost-parser';
 
 // Type definitions
 interface PredictionInput {
@@ -74,10 +74,10 @@ export function engineerFeatures(input: PredictionInput): number[] {
 
 /**
  * Get model metadata
- * @returns Model metadata including features and classes
+ * @returns Promise that resolves to model metadata including features and classes
  */
-export function getModelMetadata() {
-  return modelMetadata;
+export async function getModelMetadata(): Promise<ModelMetadata> {
+  return await loadModelMetadata();
 }
 
 /**
@@ -95,13 +95,15 @@ export function softmax(logits: number[]): number[] {
 /**
  * Get the predicted class and confidence
  * @param probabilities - Class probabilities
- * @returns Predicted class and confidence
+ * @param metadata - Optional model metadata (will be loaded if not provided)
+ * @returns Promise that resolves to predicted class and confidence
  */
-export function getPredictionResult(probabilities: number[]): { 
-  failureType: string; 
-  confidence: number;
-} {
-  const classes = modelMetadata.classes;
+export async function getPredictionResult(
+  probabilities: number[], 
+  metadata?: ModelMetadata
+): Promise<{ failureType: string; confidence: number; }> {
+  const meta = metadata || await loadModelMetadata();
+  const classes = meta.classes;
   const maxIndex = probabilities.indexOf(Math.max(...probabilities));
   const confidence = probabilities[maxIndex];
   const failureType = classes[maxIndex];
