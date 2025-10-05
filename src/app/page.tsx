@@ -263,16 +263,6 @@ export default function PredictiveMaintenanceDashboard() {
           <p className="mt-3 text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
             AI-powered system for monitoring machine health and predicting potential failures
           </p>
-          {isProduction && (
-            <div className="mt-4 p-3 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-lg inline-block">
-              <div className="flex items-center">
-                <FaInfoCircle className="text-blue-600 dark:text-blue-400 mr-2" />
-                <span className="text-blue-800 dark:text-blue-200 font-medium">
-                  Client-Side Inference: Predictions run directly in your browser
-                </span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* API Info Message for Production */}
@@ -578,13 +568,6 @@ npm run dev`}
                       Predicted at: {new Date(prediction.timestamp).toLocaleString()}
                     </span>
                   </div>
-                  
-                  {isProduction && (
-                    <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-700 dark:text-blue-300">
-                      <FaInfoCircle className="inline mr-1" />
-                      Prediction computed client-side in your browser
-                    </div>
-                  )}
                 </div>
               </div>
             )}
