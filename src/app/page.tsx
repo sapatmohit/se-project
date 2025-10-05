@@ -26,6 +26,15 @@ interface PredictionHistoryItem extends PredictionResponse {
   inputs: PredictionInput;
 }
 
+// Sample prediction data for simulation
+const samplePredictions = [
+  { failureType: "No Failure", confidence: 0.94, timestamp: new Date().toISOString() },
+  { failureType: "Tool Wear Failure", confidence: 0.87, timestamp: new Date().toISOString() },
+  { failureType: "Overstrain Failure", confidence: 0.76, timestamp: new Date().toISOString() },
+  { failureType: "Power Failure", confidence: 0.65, timestamp: new Date().toISOString() },
+  { failureType: "Heat Dissipation Failure", confidence: 0.58, timestamp: new Date().toISOString() }
+];
+
 export default function PredictiveMaintenanceDashboard() {
   // Form state
   const [formData, setFormData] = useState<PredictionInput>({
@@ -52,7 +61,10 @@ export default function PredictiveMaintenanceDashboard() {
   const [history, setHistory] = useState<PredictionHistoryItem[]>([]);
 
   // Check if running in production (GitHub Pages)
-  const isProduction = typeof window !== 'undefined' && window.location.hostname.includes('github.io');
+  const isProduction = typeof window !== 'undefined' && 
+    (window.location.hostname.includes('github.io') || 
+     (window.location.protocol === 'https:' && window.location.pathname.includes('se-project')) ||
+     process.env.NEXT_PUBLIC_DEMO_MODE === 'true');
 
   // Load history from localStorage on component mount
   useEffect(() => {
@@ -122,11 +134,54 @@ export default function PredictiveMaintenanceDashboard() {
     await makePrediction('file');
   };
 
+  // Simulate a prediction for demo purposes
+  const simulatePrediction = (): PredictionResponse => {
+    // Select a random sample prediction
+    const randomIndex = Math.floor(Math.random() * samplePredictions.length);
+    const sample = samplePredictions[randomIndex];
+    
+    // Add some slight variation to confidence for realism
+    const variation = (Math.random() - 0.5) * 0.1; // +/- 5%
+    const confidence = Math.max(0.1, Math.min(0.95, sample.confidence + variation));
+    
+    return {
+      ...sample,
+      confidence,
+      timestamp: new Date().toISOString()
+    };
+  };
+
   // Make prediction based on input type
   const makePrediction = async (inputType: 'manual' | 'file') => {
     // Show info message for production (GitHub Pages) deployment
     if (isProduction) {
-      setShowApiInfo(true);
+      console.log('Running in production mode (simulation)');
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Generate simulated prediction
+        const simulatedResult = simulatePrediction();
+        console.log('Simulated prediction result:', simulatedResult);
+        setPrediction(simulatedResult);
+        
+        // Add to history
+        const historyItem: PredictionHistoryItem = {
+          id: Date.now().toString(),
+          ...simulatedResult,
+          inputs: inputType === 'file' ? formData : { ...formData }
+        };
+        
+        setHistory(prev => [historyItem, ...prev].slice(0, 10)); // Keep only last 10 predictions
+      } catch (err) {
+        console.error('Simulation error:', err);
+        setError('Failed to generate simulation prediction');
+      } finally {
+        setIsLoading(false);
+      }
       return;
     }
 
@@ -269,7 +324,54 @@ export default function PredictiveMaintenanceDashboard() {
           <p className="mt-3 text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
             AI-powered system for monitoring machine health and predicting potential failures
           </p>
+          {isProduction && (
+            <div className="mt-4 p-3 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-lg inline-block">
+              <div className="flex items-center">
+                <FaInfoCircle className="text-blue-600 dark:text-blue-400 mr-2" />
+                <span className="text-blue-800 dark:text-blue-200 font-medium">
+                  Demo Mode: Predictions are simulated for demonstration purposes
+                </span>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* API Info Message for Production */}
+        {showApiInfo && (
+          <div className="mb-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <FaInfoCircle className="h-5 w-5 text-blue-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">GitHub Pages Deployment</h3>
+                <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
+                  <p>
+                    This demo is hosted on GitHub Pages which only serves static files. The prediction API is not available in this deployment.
+                  </p>
+                  <p className="mt-2">
+                    To use the full functionality with API predictions, run the application locally:
+                  </p>
+                  <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-x-auto">
+                    {`git clone https://github.com/sapatmohit/se-project.git
+cd se-project
+npm install
+npm run dev`}
+                  </pre>
+                </div>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowApiInfo(false)}
+                    className="text-sm font-medium text-blue-800 dark:text-blue-200 hover:text-blue-900 dark:hover:text-blue-300"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Input Form */}
@@ -537,6 +639,13 @@ export default function PredictiveMaintenanceDashboard() {
                       Predicted at: {new Date(prediction.timestamp).toLocaleString()}
                     </span>
                   </div>
+                  
+                  {isProduction && (
+                    <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-700 dark:text-blue-300">
+                      <FaInfoCircle className="inline mr-1" />
+                      This is a simulated prediction for demonstration purposes.
+                    </div>
+                  )}
                 </div>
               </div>
             )}
