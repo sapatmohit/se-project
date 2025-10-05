@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "export": "next export",
+    "deploy": "next build --turbopack && next export"
   },
   "dependencies": {
     "@types/react-icons": "^2.2.7",

@@ -1,0 +1,8 @@
+{
+  "airTemperature": 298.15,
+  "processTemperature": 308.15,
+  "rotationalSpeed": 1500,
+  "torque": 40,
+  "toolWear": 0,
+  "type": "L"
+}

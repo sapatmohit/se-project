@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { FaThermometerHalf, FaTachometerAlt, FaTools, FaExclamationTriangle, FaCheckCircle, FaHistory } from 'react-icons/fa';
+import { useEffect, useRef, useState } from 'react';
+import { FaCheckCircle, FaExclamationTriangle, FaHistory, FaInfoCircle, FaPlay, FaTachometerAlt, FaThermometerHalf, FaTools, FaTrash, FaUpload } from 'react-icons/fa';
 
 // Types for our input data
 interface PredictionInput {
@@ -37,13 +37,22 @@ export default function PredictiveMaintenanceDashboard() {
     type: 'L'
   });
 
+  // File upload state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Prediction state
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showApiInfo, setShowApiInfo] = useState(false);
 
   // History state
   const [history, setHistory] = useState<PredictionHistoryItem[]>([]);
+
+  // Check if running in production (GitHub Pages)
+  const isProduction = typeof window !== 'undefined' && window.location.hostname.includes('github.io');
 
   // Load history from localStorage on component mount
   useEffect(() => {
@@ -71,24 +80,86 @@ export default function PredictiveMaintenanceDashboard() {
     });
   };
 
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handle file selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  // Handle drag and drop events
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setSelectedFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  // Handle form submission (manual input)
+  const handleSubmitManual = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await makePrediction('manual');
+  };
+
+  // Handle file submission
+  const handleSubmitFile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFile) {
+      setError('Please select a JSON file');
+      return;
+    }
+    await makePrediction('file');
+  };
+
+  // Make prediction based on input type
+  const makePrediction = async (inputType: 'manual' | 'file') => {
+    // Show info message for production (GitHub Pages) deployment
+    if (isProduction) {
+      setShowApiInfo(true);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setPrediction(null);
 
     try {
-      const response = await fetch('/api/predict', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
+      let response: Response;
+      
+      if (inputType === 'file' && selectedFile) {
+        // File upload approach
+        const formDataObj = new FormData();
+        formDataObj.append('file', selectedFile);
+        
+        response = await fetch('/api/predict', {
+          method: 'POST',
+          body: formDataObj,
+        });
+      } else {
+        // Manual input approach
+        response = await fetch('/api/predict', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        });
+      }
 
       if (!response.ok) {
-        throw new Error(`Failed to get prediction: ${response.status} ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to get prediction: ${response.status}`);
       }
 
       const result: PredictionResponse = await response.json();
@@ -98,7 +169,7 @@ export default function PredictiveMaintenanceDashboard() {
       const historyItem: PredictionHistoryItem = {
         id: Date.now().toString(),
         ...result,
-        inputs: { ...formData }
+        inputs: inputType === 'file' ? formData : { ...formData }
       };
 
       setHistory(prev => [historyItem, ...prev].slice(0, 10)); // Keep only last 10 predictions
@@ -107,6 +178,29 @@ export default function PredictiveMaintenanceDashboard() {
       console.error('Prediction error:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Clear prediction history
+  const clearHistory = () => {
+    if (confirm('Are you sure you want to clear all prediction history? This action cannot be undone.')) {
+      setHistory([]);
+      localStorage.removeItem('predictionHistory');
+    }
+  };
+
+  // Trigger file input click
+  const triggerFileInput = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // Clear selected file
+  const clearFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -188,7 +282,10 @@ export default function PredictiveMaintenanceDashboard() {
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Machine Sensors</h2>
               </div>
               
-              <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Manual Input Form */}
+              <form onSubmit={handleSubmitManual} className="space-y-5 mb-8">
+                <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">Manual Input</h3>
+                
                 {/* Air Temperature */}
                 <div className="relative">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center">
@@ -303,10 +400,79 @@ export default function PredictiveMaintenanceDashboard() {
                       Analyzing...
                     </span>
                   ) : (
-                    'Predict Failure'
+                    <span className="flex items-center">
+                      <FaPlay className="mr-2" />
+                      Predict Failure (Manual)
+                    </span>
                   )}
                 </button>
               </form>
+
+              {/* File Upload Form */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">JSON File Input</h3>
+                
+                <div 
+                  className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                    isDragging 
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
+                      : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={triggerFileInput}
+                >
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept=".json"
+                    className="hidden"
+                  />
+                  
+                  <FaUpload className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
+                  <div className="mt-4">
+                    <p className="text-lg font-medium text-gray-900 dark:text-white">
+                      {selectedFile ? selectedFile.name : 'Drag and drop a JSON file'}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      {selectedFile ? 'Click to change file' : 'or click to browse'}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      JSON file should contain sensor data
+                    </p>
+                  </div>
+                </div>
+                
+                {selectedFile && (
+                  <div className="mt-4 flex justify-between">
+                    <button
+                      type="button"
+                      onClick={clearFile}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSubmitFile}
+                      disabled={isLoading}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
+                    >
+                      {isLoading ? (
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : (
+                        <FaPlay className="mr-2" />
+                      )}
+                      Predict Failure (File)
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {error && (
                 <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -377,11 +543,22 @@ export default function PredictiveMaintenanceDashboard() {
 
             {/* Prediction History */}
             <div className="bg-white dark:bg-gray-800 shadow-card rounded-card p-6 transition-colors duration-200">
-              <div className="flex items-center mb-6">
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg industrial-accent mr-3">
-                  <FaHistory className="text-white" />
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center">
+                  <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg industrial-accent mr-3">
+                    <FaHistory className="text-white" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Recent Predictions</h2>
                 </div>
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Recent Predictions</h2>
+                {history.length > 0 && (
+                  <button
+                    onClick={clearHistory}
+                    className="flex items-center px-3 py-2 text-sm font-medium text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                  >
+                    <FaTrash className="mr-1" />
+                    Clear History
+                  </button>
+                )}
               </div>
               
               {history.length === 0 ? (

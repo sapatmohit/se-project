@@ -6,7 +6,9 @@ A full-stack Next.js 15 web interface for an AI-powered predictive maintenance s
 
 - Real-time failure prediction using XGBoost machine learning model
 - Responsive dashboard with Tailwind CSS styling
-- Sensor data input form (Air temperature, Process temperature, Rotational speed, Torque, Tool wear, Machine Type)
+- Two input methods:
+  - Manual sensor data input (Air temperature, Process temperature, Rotational speed, Torque, Tool wear, Machine Type)
+  - JSON file upload for batch predictions
 - Color-coded prediction results with confidence levels
 - Prediction history tracking
 - REST API for model inference
@@ -62,6 +64,8 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 │   │   ├── page.tsx       # Main dashboard page
 │   │   ├── layout.tsx     # Root layout
 │   │   └── globals.css    # Global styles
+├── public/                # Static assets
+│   └── sample-data.json   # Sample JSON file for testing
 ├── package.json           # Node.js dependencies
 └── README.md              # This file
 ```
@@ -73,6 +77,70 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 2. **Prediction API**: The `/api/predict` endpoint receives sensor data, processes it through the trained model, and returns the predicted failure type with confidence.
 
 3. **Frontend Dashboard**: The React-based dashboard allows users to input sensor readings and view predictions in real-time.
+
+## JSON File Input
+
+You can upload a JSON file containing sensor data instead of manually entering values. The JSON file should have the following structure:
+
+```json
+{
+  "airTemperature": 298.15,
+  "processTemperature": 308.15,
+  "rotationalSpeed": 1500,
+  "torque": 40,
+  "toolWear": 0,
+  "type": "L"
+}
+```
+
+A sample file is available at `/sample-data.json` in the public directory.
+
+## Deployment
+
+### GitHub Pages Deployment
+
+This application can be deployed to GitHub Pages, but note that GitHub Pages only serves static files, so the prediction API will not be available in the deployed version.
+
+To deploy to GitHub Pages:
+
+1. Build and export the application:
+   ```bash
+   npm run deploy
+   ```
+
+2. Deploy the `out` directory to your GitHub Pages:
+   - If using GitHub Actions, set up a workflow to automatically deploy the `out` directory
+   - Or manually push the contents of the `out` directory to your `gh-pages` branch
+
+The application will be accessible at: https://sapatmohit.github.io/se-project/
+
+### Local Development with Full Functionality
+
+To use the full functionality including the prediction API, run the application locally:
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/sapatmohit/se-project.git
+   cd se-project
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   pip install -r AI/requirements.txt
+   ```
+
+3. Train the model:
+   ```bash
+   python AI/model_train.py
+   ```
+
+4. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+5. Open [http://localhost:3000](http://localhost:3000) in your browser
 
 ## Customization
 
