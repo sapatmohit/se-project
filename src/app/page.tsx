@@ -1,103 +1,443 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useEffect, useState } from 'react';
+import { FaThermometerHalf, FaTachometerAlt, FaTools, FaExclamationTriangle, FaCheckCircle, FaHistory } from 'react-icons/fa';
+
+// Types for our input data
+interface PredictionInput {
+  airTemperature: number;
+  processTemperature: number;
+  rotationalSpeed: number;
+  torque: number;
+  toolWear: number;
+  type: 'L' | 'M' | 'H';
+}
+
+// Types for our prediction response
+interface PredictionResponse {
+  failureType: string;
+  confidence: number;
+  timestamp: string;
+}
+
+// Types for our prediction history
+interface PredictionHistoryItem extends PredictionResponse {
+  id: string;
+  inputs: PredictionInput;
+}
+
+export default function PredictiveMaintenanceDashboard() {
+  // Form state
+  const [formData, setFormData] = useState<PredictionInput>({
+    airTemperature: 298.15,
+    processTemperature: 308.15,
+    rotationalSpeed: 1500,
+    torque: 40,
+    toolWear: 0,
+    type: 'L'
+  });
+
+  // Prediction state
+  const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // History state
+  const [history, setHistory] = useState<PredictionHistoryItem[]>([]);
+
+  // Load history from localStorage on component mount
+  useEffect(() => {
+    const savedHistory = localStorage.getItem('predictionHistory');
+    if (savedHistory) {
+      try {
+        setHistory(JSON.parse(savedHistory));
+      } catch (e) {
+        console.error('Failed to parse history', e);
+      }
+    }
+  }, []);
+
+  // Save history to localStorage
+  useEffect(() => {
+    localStorage.setItem('predictionHistory', JSON.stringify(history));
+  }, [history]);
+
+  // Handle form input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: name === 'type' ? value : parseFloat(value) || 0
+    });
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    setPrediction(null);
+
+    try {
+      const response = await fetch('/api/predict', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to get prediction: ${response.status} ${response.statusText}`);
+      }
+
+      const result: PredictionResponse = await response.json();
+      setPrediction(result);
+
+      // Add to history
+      const historyItem: PredictionHistoryItem = {
+        id: Date.now().toString(),
+        ...result,
+        inputs: { ...formData }
+      };
+
+      setHistory(prev => [historyItem, ...prev].slice(0, 10)); // Keep only last 10 predictions
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      console.error('Prediction error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Get confidence color based on value
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 0.8) return 'confidence-high';
+    if (confidence >= 0.6) return 'confidence-medium';
+    if (confidence >= 0.4) return 'confidence-medium';
+    return 'confidence-low';
+  };
+
+  // Get failure type color
+  const getFailureTypeColor = (failureType: string) => {
+    switch (failureType) {
+      case 'No Failure':
+        return 'failure-type-no-failure';
+      case 'Tool Wear Failure':
+        return 'failure-type-tool-wear';
+      case 'Power Failure':
+        return 'failure-type-power';
+      case 'Overstrain Failure':
+        return 'failure-type-overstrain';
+      case 'Heat Dissipation Failure':
+        return 'failure-type-heat';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Get health indicator based on failure type
+  const getHealthIndicator = (failureType: string) => {
+    if (failureType === 'No Failure') {
+      return <span className="health-indicator good"></span>;
+    } else if (failureType.includes('Failure')) {
+      return <span className="health-indicator critical"></span>;
+    } else {
+      return <span className="health-indicator warning"></span>;
+    }
+  };
+
+  // Get icon for sensor type
+  const getSensorIcon = (sensorType: string) => {
+    switch (sensorType) {
+      case 'temperature':
+        return <FaThermometerHalf className="text-blue-500" />;
+      case 'speed':
+        return <FaTachometerAlt className="text-green-500" />;
+      case 'torque':
+        return <FaTools className="text-purple-500" />;
+      default:
+        return <FaExclamationTriangle className="text-yellow-500" />;
+    }
+  };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 py-8 transition-colors duration-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full industrial-gradient mb-4">
+            <FaTools className="text-white text-2xl" />
+          </div>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white sm:text-5xl">
+            Predictive Maintenance
+          </h1>
+          <p className="mt-3 text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+            AI-powered system for monitoring machine health and predicting potential failures
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Input Form */}
+          <div className="lg:col-span-1">
+            <div className="bg-white dark:bg-gray-800 shadow-card rounded-card p-6 transition-colors duration-200">
+              <div className="flex items-center mb-6">
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg industrial-accent mr-3">
+                  <FaTools className="text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Machine Sensors</h2>
+              </div>
+              
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Air Temperature */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center">
+                    {getSensorIcon('temperature')}
+                    <span className="ml-2">Air Temperature [K]</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="airTemperature"
+                    value={formData.airTemperature}
+                    onChange={handleInputChange}
+                    step="0.01"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent input-field bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    required
+                  />
+                </div>
+
+                {/* Process Temperature */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center">
+                    {getSensorIcon('temperature')}
+                    <span className="ml-2">Process Temperature [K]</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="processTemperature"
+                    value={formData.processTemperature}
+                    onChange={handleInputChange}
+                    step="0.01"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent input-field bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    required
+                  />
+                </div>
+
+                {/* Rotational Speed */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center">
+                    {getSensorIcon('speed')}
+                    <span className="ml-2">Rotational Speed [rpm]</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="rotationalSpeed"
+                    value={formData.rotationalSpeed}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent input-field bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    required
+                  />
+                </div>
+
+                {/* Torque */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center">
+                    {getSensorIcon('torque')}
+                    <span className="ml-2">Torque [Nm]</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="torque"
+                    value={formData.torque}
+                    onChange={handleInputChange}
+                    step="0.1"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent input-field bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    required
+                  />
+                </div>
+
+                {/* Tool Wear */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center">
+                    <FaTools className="text-gray-500" />
+                    <span className="ml-2">Tool Wear [min]</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="toolWear"
+                    value={formData.toolWear}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent input-field bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    required
+                  />
+                </div>
+
+                {/* Machine Type */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Machine Type
+                  </label>
+                  <select
+                    name="type"
+                    value={formData.type}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent input-field appearance-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="L">L (Low Complexity)</option>
+                    <option value="M">M (Medium Complexity)</option>
+                    <option value="H">H (High Complexity)</option>
+                  </select>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white btn-primary disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Analyzing...
+                    </span>
+                  ) : (
+                    'Predict Failure'
+                  )}
+                </button>
+              </form>
+
+              {error && (
+                <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <FaExclamationTriangle className="h-5 w-5 text-red-400" />
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Error</h3>
+                      <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                        <p>{error}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Results and History */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Prediction Result */}
+            {prediction && (
+              <div className="bg-white dark:bg-gray-800 shadow-card rounded-card p-6 transition-colors duration-200">
+                <div className="flex items-center mb-6">
+                  <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg industrial-gradient mr-3">
+                    <FaCheckCircle className="text-white" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Prediction Result</h2>
+                </div>
+                
+                <div className="flex flex-col items-center justify-center py-8">
+                  <div className="text-2xl font-bold mb-2 text-gray-700 dark:text-gray-300">Predicted Failure Type</div>
+                  <div className={`text-4xl font-bold mb-6 px-8 py-4 rounded-full ${getFailureTypeColor(prediction.failureType)} shadow-lg`}>
+                    {prediction.failureType}
+                  </div>
+                  
+                  <div className="w-full max-w-md">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-lg font-medium text-gray-700 dark:text-gray-300">Confidence Level</span>
+                      <span className={`text-2xl font-bold ${getConfidenceColor(prediction.confidence)}`}>
+                        {(prediction.confidence * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-4">
+                      <div 
+                        className={`h-4 rounded-full ${prediction.confidence >= 0.8 ? 'bg-green-500' : prediction.confidence >= 0.6 ? 'bg-yellow-500' : prediction.confidence >= 0.4 ? 'bg-orange-500' : 'bg-red-500'}`}
+                        style={{ width: `${prediction.confidence * 100}%` }}
+                      ></div>
+                    </div>
+                    
+                    <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+                      <span>Low</span>
+                      <span>High</span>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-6 flex items-center text-gray-600 dark:text-gray-400">
+                    {getHealthIndicator(prediction.failureType)}
+                    <span className="ml-2">
+                      Predicted at: {new Date(prediction.timestamp).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Prediction History */}
+            <div className="bg-white dark:bg-gray-800 shadow-card rounded-card p-6 transition-colors duration-200">
+              <div className="flex items-center mb-6">
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg industrial-accent mr-3">
+                  <FaHistory className="text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Recent Predictions</h2>
+              </div>
+              
+              {history.length === 0 ? (
+                <div className="text-center py-12">
+                  <FaHistory className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
+                  <h3 className="mt-2 text-lg font-medium text-gray-900 dark:text-white">No predictions yet</h3>
+                  <p className="mt-1 text-gray-500 dark:text-gray-400">
+                    Submit sensor data to see your prediction history.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Failure Type
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Confidence
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Time
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                      {history.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {getHealthIndicator(item.failureType)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full ${getFailureTypeColor(item.failureType)}`}>
+                              {item.failureType}
+                            </span>
+                          </td>
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${getConfidenceColor(item.confidence)}`}>
+                            {(item.confidence * 100).toFixed(1)}%
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {new Date(item.timestamp).toLocaleTimeString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
