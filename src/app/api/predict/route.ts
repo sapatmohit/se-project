@@ -50,13 +50,13 @@ function callPythonPrediction(input: PredictionInput): Promise<PredictionRespons
       try {
         const result = JSON.parse(stdoutData);
         resolve(result);
-      } catch (error) {
+      } catch {
         reject(new Error(`Failed to parse Python output: ${stdoutData}`));
       }
     });
     
-    python.on('error', (error) => {
-      reject(new Error(`Failed to start Python process: ${error.message}`));
+    python.on('error', (err: Error) => {
+      reject(new Error(`Failed to start Python process: ${err.message}`));
     });
   });
 }
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       
       try {
         inputData = JSON.parse(fileContent);
-      } catch (error) {
+      } catch {
         return Response.json(
           { error: 'Invalid JSON in file' }, 
           { status: 400 }
@@ -122,10 +122,10 @@ export async function POST(request: NextRequest) {
       const result = await callPythonPrediction(body);
       return Response.json(result);
     }
-  } catch (error) {
-    console.error('Prediction error:', error);
+  } catch (err) {
+    console.error('Prediction error:', err);
     return Response.json(
-      { error: (error as Error).message || 'Failed to make prediction' }, 
+      { error: (err as Error).message || 'Failed to make prediction' }, 
       { status: 500 }
     );
   }

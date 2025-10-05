@@ -15,10 +15,10 @@ export interface XGBoostNode {
 
 export interface XGBoostTree {
   base_weights?: number[];
-  categories?: any[];
-  categories_nodes?: any[];
-  categories_segments?: any[];
-  categories_sizes?: any[];
+  categories?: unknown[];
+  categories_nodes?: unknown[];
+  categories_segments?: unknown[];
+  categories_sizes?: unknown[];
   default_left?: number[];
   id?: number;
   left_children?: number[];
@@ -39,7 +39,7 @@ export interface XGBoostTree {
 
 export interface XGBoostModel {
   learner: {
-    attributes?: any;
+    attributes?: Record<string, string>;
     feature_names: string[];
     feature_types: string[];
     gradient_booster: {
@@ -159,7 +159,6 @@ export function traverseTree(tree: XGBoostTree, features: number[]): number {
   const splitIndices = tree.split_indices || [];
   const splitConditions = tree.split_conditions || [];
   const baseWeights = tree.base_weights || [];
-  const defaultLeft = tree.default_left || [];
   
   // Start at root node (index 0)
   let nodeIdx = 0;

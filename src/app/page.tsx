@@ -52,12 +52,6 @@ export default function PredictiveMaintenanceDashboard() {
   // History state
   const [history, setHistory] = useState<PredictionHistoryItem[]>([]);
 
-  // Check if running in production (GitHub Pages)
-  const isProduction = typeof window !== 'undefined' && 
-    (window.location.hostname.includes('github.io') || 
-     (window.location.protocol === 'https:' && window.location.pathname.includes('se-project')) ||
-     process.env.NEXT_PUBLIC_DEMO_MODE === 'true');
-
   // Load history from localStorage on component mount
   useEffect(() => {
     const savedHistory = localStorage.getItem('predictionHistory');
