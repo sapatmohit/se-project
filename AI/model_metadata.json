@@ -1,0 +1,24 @@
+{
+  "features": [
+    "Type_enc",
+    "Air_temperature_K",
+    "Process_temperature_K",
+    "Rotational_speed_rpm",
+    "Torque_Nm",
+    "Tool_wear_min",
+    "Temp_Diff",
+    "Stress_Index",
+    "Torque_Speed_Ratio",
+    "Torque_roll_mean5",
+    "Torque_roll_std5",
+    "Wear_diff"
+  ],
+  "classes": [
+    "Heat Dissipation Failure",
+    "No Failure",
+    "Overstrain Failure",
+    "Random Failures",
+    "Tool Wear Failure"
+  ],
+  "num_classes": 5
+}

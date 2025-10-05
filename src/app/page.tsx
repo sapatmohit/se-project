@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { FaCheckCircle, FaExclamationTriangle, FaHistory, FaInfoCircle, FaPlay, FaTachometerAlt, FaThermometerHalf, FaTools, FaTrash, FaUpload } from 'react-icons/fa';
+import { predictFailure } from '../lib/xgboost-client';
 
 // Types for our input data
 interface PredictionInput {
@@ -25,15 +26,6 @@ interface PredictionHistoryItem extends PredictionResponse {
   id: string;
   inputs: PredictionInput;
 }
-
-// Sample prediction data for simulation
-const samplePredictions = [
-  { failureType: "No Failure", confidence: 0.94, timestamp: new Date().toISOString() },
-  { failureType: "Tool Wear Failure", confidence: 0.87, timestamp: new Date().toISOString() },
-  { failureType: "Overstrain Failure", confidence: 0.76, timestamp: new Date().toISOString() },
-  { failureType: "Power Failure", confidence: 0.65, timestamp: new Date().toISOString() },
-  { failureType: "Heat Dissipation Failure", confidence: 0.58, timestamp: new Date().toISOString() }
-];
 
 export default function PredictiveMaintenanceDashboard() {
   // Form state
@@ -134,97 +126,44 @@ export default function PredictiveMaintenanceDashboard() {
     await makePrediction('file');
   };
 
-  // Simulate a prediction for demo purposes
-  const simulatePrediction = (): PredictionResponse => {
-    // Select a random sample prediction
-    const randomIndex = Math.floor(Math.random() * samplePredictions.length);
-    const sample = samplePredictions[randomIndex];
-    
-    // Add some slight variation to confidence for realism
-    const variation = (Math.random() - 0.5) * 0.1; // +/- 5%
-    const confidence = Math.max(0.1, Math.min(0.95, sample.confidence + variation));
-    
-    return {
-      ...sample,
-      confidence,
-      timestamp: new Date().toISOString()
-    };
-  };
-
   // Make prediction based on input type
   const makePrediction = async (inputType: 'manual' | 'file') => {
-    // Show info message for production (GitHub Pages) deployment
-    if (isProduction) {
-      console.log('Running in production mode (simulation)');
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Generate simulated prediction
-        const simulatedResult = simulatePrediction();
-        console.log('Simulated prediction result:', simulatedResult);
-        setPrediction(simulatedResult);
-        
-        // Add to history
-        const historyItem: PredictionHistoryItem = {
-          id: Date.now().toString(),
-          ...simulatedResult,
-          inputs: inputType === 'file' ? formData : { ...formData }
-        };
-        
-        setHistory(prev => [historyItem, ...prev].slice(0, 10)); // Keep only last 10 predictions
-      } catch (err) {
-        console.error('Simulation error:', err);
-        setError('Failed to generate simulation prediction');
-      } finally {
-        setIsLoading(false);
-      }
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
     setPrediction(null);
 
     try {
-      let response: Response;
+      // Use client-side XGBoost inference for all cases
+      let input: PredictionInput;
       
       if (inputType === 'file' && selectedFile) {
         // File upload approach
-        const formDataObj = new FormData();
-        formDataObj.append('file', selectedFile);
+        const fileContent = await selectedFile.text();
+        const fileData = JSON.parse(fileContent);
         
-        response = await fetch('/api/predict', {
-          method: 'POST',
-          body: formDataObj,
-        });
+        // Map file data to our input format
+        input = {
+          airTemperature: fileData.airTemperature || fileData.Air_temperature_K || formData.airTemperature,
+          processTemperature: fileData.processTemperature || fileData.Process_temperature_K || formData.processTemperature,
+          rotationalSpeed: fileData.rotationalSpeed || fileData.Rotational_speed_rpm || formData.rotationalSpeed,
+          torque: fileData.torque || fileData.Torque_Nm || formData.torque,
+          toolWear: fileData.toolWear || fileData.Tool_wear_min || formData.toolWear,
+          type: fileData.type || formData.type
+        };
       } else {
         // Manual input approach
-        response = await fetch('/api/predict', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(formData),
-        });
+        input = { ...formData };
       }
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to get prediction: ${response.status}`);
-      }
-
-      const result: PredictionResponse = await response.json();
+      // Make prediction using client-side XGBoost
+      const result = await predictFailure(input);
       setPrediction(result);
 
       // Add to history
       const historyItem: PredictionHistoryItem = {
         id: Date.now().toString(),
         ...result,
-        inputs: inputType === 'file' ? formData : { ...formData }
+        inputs: input
       };
 
       setHistory(prev => [historyItem, ...prev].slice(0, 10)); // Keep only last 10 predictions
@@ -329,7 +268,7 @@ export default function PredictiveMaintenanceDashboard() {
               <div className="flex items-center">
                 <FaInfoCircle className="text-blue-600 dark:text-blue-400 mr-2" />
                 <span className="text-blue-800 dark:text-blue-200 font-medium">
-                  Demo Mode: Predictions are simulated for demonstration purposes
+                  Client-Side Inference: Predictions run directly in your browser
                 </span>
               </div>
             </div>
@@ -347,7 +286,7 @@ export default function PredictiveMaintenanceDashboard() {
                 <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">GitHub Pages Deployment</h3>
                 <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
                   <p>
-                    This demo is hosted on GitHub Pages which only serves static files. The prediction API is not available in this deployment.
+                    This application runs entirely in your browser using client-side machine learning inference.
                   </p>
                   <p className="mt-2">
                     To use the full functionality with API predictions, run the application locally:
@@ -643,7 +582,7 @@ npm run dev`}
                   {isProduction && (
                     <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-700 dark:text-blue-300">
                       <FaInfoCircle className="inline mr-1" />
-                      This is a simulated prediction for demonstration purposes.
+                      Prediction computed client-side in your browser
                     </div>
                   )}
                 </div>
