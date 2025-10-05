@@ -91,16 +91,21 @@ export async function loadXGBoostModel(): Promise<XGBoostModel> {
   try {
     console.log('Loading actual XGBoost model from server...');
     
-    // Get the base path from the environment or use default
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-    const modelUrl = `${basePath}/xgboost_model.json`;
+    // Determine the correct path based on environment
+    let modelUrl = '/xgboost_model.json';
+    
+    // For GitHub Pages deployment with basePath
+    if (typeof window !== 'undefined') {
+      const pathPrefix = window.location.pathname.includes('/se-project') ? '/se-project' : '';
+      modelUrl = `${pathPrefix}/xgboost_model.json`;
+    }
     
     console.log(`Fetching model from: ${modelUrl}`);
     
     // Fetch the actual model file
     const modelResponse = await fetch(modelUrl);
     if (!modelResponse.ok) {
-      throw new Error(`Failed to fetch model: ${modelResponse.statusText}`);
+      throw new Error(`Failed to fetch model: ${modelResponse.statusText} (URL: ${modelUrl})`);
     }
     
     cachedModel = await modelResponse.json();
@@ -126,12 +131,18 @@ export async function loadModelMetadata(): Promise<ModelMetadata> {
   }
 
   try {
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-    const metadataUrl = `${basePath}/model_metadata.json`;
+    // Determine the correct path based on environment
+    let metadataUrl = '/model_metadata.json';
+    
+    // For GitHub Pages deployment with basePath
+    if (typeof window !== 'undefined') {
+      const pathPrefix = window.location.pathname.includes('/se-project') ? '/se-project' : '';
+      metadataUrl = `${pathPrefix}/model_metadata.json`;
+    }
     
     const metadataResponse = await fetch(metadataUrl);
     if (!metadataResponse.ok) {
-      throw new Error(`Failed to fetch metadata: ${metadataResponse.statusText}`);
+      throw new Error(`Failed to fetch metadata: ${metadataResponse.statusText} (URL: ${metadataUrl})`);
     }
     
     cachedMetadata = await metadataResponse.json();
