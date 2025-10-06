@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { FaCheckCircle, FaExclamationTriangle, FaHistory, FaInfoCircle, FaPlay, FaTachometerAlt, FaThermometerHalf, FaTools, FaTrash, FaUpload } from 'react-icons/fa';
+import { FaCheckCircle, FaExclamationTriangle, FaHistory, FaInfoCircle, FaMoon, FaPlay, FaSun, FaTachometerAlt, FaThermometerHalf, FaTools, FaTrash, FaUpload } from 'react-icons/fa';
 
 // Types for our input data
 interface PredictionInput {
@@ -49,6 +49,34 @@ export default function PredictiveMaintenanceDashboard() {
 
   // History state
   const [history, setHistory] = useState<PredictionHistoryItem[]>([]);
+
+  // Theme state
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  
+  // Initialize theme
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+    
+    setTheme(initialTheme);
+    if (initialTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+  
+  // Toggle theme
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
 
   // Load history from localStorage on component mount
   useEffect(() => {
@@ -250,8 +278,21 @@ export default function PredictiveMaintenanceDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full industrial-gradient mb-4">
-            <FaTools className="text-white text-2xl" />
+          <div className="flex justify-between items-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full industrial-gradient mb-4">
+              <FaTools className="text-white text-2xl" />
+            </div>
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full bg-white dark:bg-gray-700 shadow-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+              aria-label="Toggle theme"
+            >
+              {theme === 'light' ? (
+                <FaMoon className="text-gray-700 dark:text-gray-300" />
+              ) : (
+                <FaSun className="text-gray-700 dark:text-gray-300" />
+              )}
+            </button>
           </div>
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white sm:text-5xl">
             Predictive Maintenance
