@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { FaCheckCircle, FaExclamationTriangle, FaHistory, FaInfoCircle, FaPlay, FaTachometerAlt, FaThermometerHalf, FaTools, FaTrash, FaUpload } from 'react-icons/fa';
-import { predictFailure } from '../lib/xgboost-client';
 
 // Types for our input data
 interface PredictionInput {
@@ -47,13 +46,9 @@ export default function PredictiveMaintenanceDashboard() {
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showApiInfo, setShowApiInfo] = useState(false);
 
   // History state
   const [history, setHistory] = useState<PredictionHistoryItem[]>([]);
-
-  // Check if running in production (GitHub Pages)
-  const isProduction = typeof window !== 'undefined' && window.location.hostname.includes('github.io');
 
   // Load history from localStorage on component mount
   useEffect(() => {
@@ -125,48 +120,46 @@ export default function PredictiveMaintenanceDashboard() {
 
   // Make prediction based on input type
   const makePrediction = async (inputType: 'manual' | 'file') => {
-    // Show info message for production (GitHub Pages) deployment
-    if (isProduction) {
-      setShowApiInfo(true);
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
     setPrediction(null);
 
     try {
-      // Use client-side XGBoost inference for all cases
-      let input: PredictionInput;
+      let response: Response;
       
       if (inputType === 'file' && selectedFile) {
         // File upload approach
-        const fileContent = await selectedFile.text();
-        const fileData = JSON.parse(fileContent);
+        const formDataObj = new FormData();
+        formDataObj.append('file', selectedFile);
         
-        // Map file data to our input format
-        input = {
-          airTemperature: fileData.airTemperature || fileData.Air_temperature_K || formData.airTemperature,
-          processTemperature: fileData.processTemperature || fileData.Process_temperature_K || formData.processTemperature,
-          rotationalSpeed: fileData.rotationalSpeed || fileData.Rotational_speed_rpm || formData.rotationalSpeed,
-          torque: fileData.torque || fileData.Torque_Nm || formData.torque,
-          toolWear: fileData.toolWear || fileData.Tool_wear_min || formData.toolWear,
-          type: fileData.type || formData.type
-        };
+        response = await fetch('/api/predict', {
+          method: 'POST',
+          body: formDataObj,
+        });
       } else {
         // Manual input approach
-        input = { ...formData };
+        response = await fetch('/api/predict', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        });
       }
 
-      // Make prediction using client-side XGBoost
-      const result = await predictFailure(input);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to get prediction: ${response.status}`);
+      }
+
+      const result: PredictionResponse = await response.json();
       setPrediction(result);
 
       // Add to history
       const historyItem: PredictionHistoryItem = {
         id: Date.now().toString(),
         ...result,
-        inputs: input
+        inputs: inputType === 'file' ? formData : { ...formData }
       };
 
       setHistory(prev => [historyItem, ...prev].slice(0, 10)); // Keep only last 10 predictions
