@@ -52,6 +52,9 @@ export default function PredictiveMaintenanceDashboard() {
   // History state
   const [history, setHistory] = useState<PredictionHistoryItem[]>([]);
 
+  // Check if running in production (GitHub Pages)
+  const isProduction = typeof window !== 'undefined' && window.location.hostname.includes('github.io');
+
   // Load history from localStorage on component mount
   useEffect(() => {
     const savedHistory = localStorage.getItem('predictionHistory');
@@ -122,6 +125,12 @@ export default function PredictiveMaintenanceDashboard() {
 
   // Make prediction based on input type
   const makePrediction = async (inputType: 'manual' | 'file') => {
+    // Show info message for production (GitHub Pages) deployment
+    if (isProduction) {
+      setShowApiInfo(true);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setPrediction(null);
@@ -258,43 +267,6 @@ export default function PredictiveMaintenanceDashboard() {
             AI-powered system for monitoring machine health and predicting potential failures
           </p>
         </div>
-
-        {/* API Info Message for Production */}
-        {showApiInfo && (
-          <div className="mb-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <FaInfoCircle className="h-5 w-5 text-blue-400" />
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">GitHub Pages Deployment</h3>
-                <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
-                  <p>
-                    This application runs entirely in your browser using client-side machine learning inference.
-                  </p>
-                  <p className="mt-2">
-                    To use the full functionality with API predictions, run the application locally:
-                  </p>
-                  <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-x-auto">
-                    {`git clone https://github.com/sapatmohit/se-project.git
-cd se-project
-npm install
-npm run dev`}
-                  </pre>
-                </div>
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowApiInfo(false)}
-                    className="text-sm font-medium text-blue-800 dark:text-blue-200 hover:text-blue-900 dark:hover:text-blue-300"
-                  >
-                    Dismiss
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Input Form */}
